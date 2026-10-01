@@ -5,6 +5,12 @@ x-api-env: &api-env
   MODEL: ${MODEL:-claude-opus-5-5}
   EFFORT: ${EFFORT:-medium}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  HF_TOKEN: ${HF_TOKEN:-}
+  HF_PROVIDER: ${HF_PROVIDER:-auto}
+  HF_CHAT_MODEL: ${HF_CHAT_MODEL:-Qwen/Qwen3-235B-A22B-Instruct-2507}
+  EMBEDDINGS_URL: ${EMBEDDINGS_URL:-http://embeddings:80}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+  EMBEDDING_DIM: ${EMBEDDING_DIM:-384}
   GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
   GCP_REGION: ${GCP_REGION:-global}
   GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
@@ -51,7 +57,8 @@ services:
           memory: 1g
 
   postgres:
-    image: postgres:16-alpine
+    # Postgres 16 with the pgvector extension, for semantic search.
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: agentic
       POSTGRES_USER: agentic
@@ -79,6 +86,22 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # Hugging Face Text Embeddings Inference: serves an open embedding model on CPU.
+  # Downloads the model from the Hub on first start (cached in the hf-cache volume).
+  # If it is down, the app falls back to keyword search and backfills vectors later.
+  embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
+    command: ["--model-id", "${EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}", "--port", "80"]
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - hf-cache:/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
   # --- optional observability stack: docker compose --profile monitoring up ---
   prometheus:
     image: prom/prometheus:v2.54.1
@@ -101,5 +124,6 @@ services:
     depends_on: [prometheus]
 
 volumes:
+  hf-cache:
   pgdata:
   redisdata:

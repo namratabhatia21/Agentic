@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     # "anthropic": Claude API (billed to Anthropic Console credits)
     # "vertex":    Claude on Google Cloud Vertex AI (billed to your GCP account)
     # "bedrock":   Claude on Amazon Bedrock (billed to your AWS account)
-    llm_provider: Literal["anthropic", "vertex", "bedrock"] = "anthropic"
+    # "huggingface": an open-weight model (Qwen, Llama, ...) via Hugging Face Inference Providers
+    llm_provider: Literal["anthropic", "vertex", "bedrock", "huggingface"] = "anthropic"
     model: str = "claude-opus-5-5"
     effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
     max_tokens: int = 64000
@@ -24,6 +25,27 @@ class Settings(BaseSettings):
     gcp_project_id: str | None = None
     gcp_region: str = "global"
     aws_region: str = "us-east-1"
+
+    # --- Hugging Face ----------------------------------------------------------
+    # One token (hf.co/settings/tokens, "Make calls to Inference Providers") enables the
+    # open-weight chat model, hosted embeddings and the HF tools (image generation,
+    # classification). Hub search works without it.
+    hf_token: str | None = None
+    hf_provider: str = "auto"  # or pin one: "together", "groq", "fireworks-ai", ...
+    hf_chat_model: str = "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    hf_max_tokens: int = 4096
+    hf_image_model: str = "black-forest-labs/FLUX.1-schnell"
+    hf_sentiment_model: str = "cardiffnlp/twitter-roberta-base-sentiment-latest"
+    hf_zero_shot_model: str = "facebook/bart-large-mnli"
+
+    # Embeddings for semantic knowledge-base search. EMBEDDINGS_URL points at a
+    # Text Embeddings Inference server (the `embeddings` compose service). If it is
+    # unset but HF_TOKEN is set, EMBEDDING_MODEL is called on Hugging Face instead.
+    embeddings_url: str | None = None
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    embedding_dim: int = 384
+    # bge models expect this instruction in front of search queries (not documents).
+    embedding_query_prefix: str = "Represent this sentence for searching relevant passages: "
 
     # --- Infrastructure -----------------------------------------------------
     database_url: str = "postgresql://agentic:agentic@localhost:5432/agentic"

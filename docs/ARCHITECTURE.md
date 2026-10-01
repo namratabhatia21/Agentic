@@ -12,9 +12,12 @@ flowchart LR
     U[Browser UI] -->|HTTPS, SSE| N[Nginx<br/>rate limit, SSE proxy,<br/>security headers]
     N --> A[FastAPI API<br/>agent loop]
     A -->|Messages API, streaming| C[(Claude<br/>Anthropic API / Vertex AI / Bedrock)]
+    A -.->|or: LLM_PROVIDER=huggingface| O[(Open-weight LLM<br/>HF Inference Providers)]
     C -.->|server tools| W[Web search<br/>Web fetch]
+    A -->|embed| E[Text Embeddings Inference<br/>bge-small, CPU]
+    A -->|images, classification| HF[HF Inference Providers<br/>FLUX, RoBERTa, BART-MNLI]
     A --> R[(Redis<br/>rate limits, locks,<br/>tool cache)]
-    A --> P[(PostgreSQL<br/>conversations, knowledge base,<br/>analytics schema)]
+    A --> P[(PostgreSQL + pgvector<br/>conversations, knowledge base,<br/>images, analytics schema)]
     A -->|HTTP| X[Live data APIs<br/>arXiv, Wikipedia, HN,<br/>Open-Meteo, ECB rates]
     PR[Prometheus] -->|scrape /metrics| A
     G[Grafana] --> PR
@@ -48,9 +51,11 @@ sequenceDiagram
 |---|---|---|
 | Nginx | Public entry point. SSE-safe proxying (`proxy_buffering off`), per-IP request limiting, hides `/metrics`, security headers. | `nginx/nginx.conf` |
 | API (FastAPI + Uvicorn) | Auth, rate limiting, the agent loop, persistence, health and metrics endpoints, serves the UI. Stateless, so it scales horizontally. | `app/main.py`, `app/agent.py` |
-| LLM client factory | One codebase, three billing backends: Claude API, Vertex AI (GCP), Bedrock (AWS). Picks the server tools each platform supports. | `app/llm.py` |
+| LLM client factory | Claude through three billing backends (Claude API, Vertex AI, Bedrock), or an open-weight model on Hugging Face. Picks the server tools each platform supports. | `app/llm.py` |
+| Open-model agent | Same loop and UI events in the chat-completions format: streamed tool-call arguments, parallel tools, `tool` role results. Conversations are tagged with their format, so they can't be mixed across providers. | `app/hf_agent.py` |
+| Embeddings | Hugging Face model via a local TEI server, or hosted with `HF_TOKEN`. Query instruction prefix for bge, L2-normalised, dimension-checked. | `app/embeddings.py` |
 | Tools | Typed pydantic inputs → JSON schema, validated before execution, errors returned to the model as `is_error` results. | `app/tools/` |
-| PostgreSQL | `conversations` + `messages` (full content blocks as JSONB), `documents` (full-text-searchable knowledge base), `analytics` schema (demo business data). | `app/db.py`, `db/init/` |
+| PostgreSQL + pgvector | `conversations` + `messages` (full messages as JSONB), `documents` (tsvector + HNSW vector index), `images` (generated PNGs), `analytics` schema (demo business data). | `app/db.py`, `db/init/` |
 | Redis | Fixed-window rate limits, one-reply-at-a-time conversation locks, 5-minute cache for outbound tool HTTP calls. | `app/main.py`, `app/tools/base.py` |
 | Prometheus / Grafana | Optional (`--profile monitoring`). Request outcomes, model step latency, tool calls/latency, token usage including cache reads. | `app/metrics.py`, `monitoring/` |
 
@@ -64,7 +69,10 @@ sequenceDiagram
 | `search_wikipedia` | Client | MediaWiki API |
 | `get_weather` | Client | Open-Meteo |
 | `get_exchange_rates` | Client | ECB reference rates (Frankfurter) |
-| `search_knowledge_base` / `save_to_knowledge_base` | Client | Postgres full-text search |
+| `search_knowledge_base` / `save_to_knowledge_base` | Client | Hybrid: HF embeddings in pgvector + Postgres full-text search, fused by rank |
+| `search_huggingface_hub` | Client | Hugging Face Hub API: models, datasets, Spaces |
+| `generate_image` | Client (HF) | FLUX.1-schnell via Inference Providers |
+| `classify_text` | Client (HF) | RoBERTa sentiment, BART-MNLI zero-shot |
 | `describe_database` / `query_database` | Client | Postgres `analytics` schema, read-only |
 | `calculator` | Client | Safe AST evaluator (no `eval`) |
 | `get_current_time` | Client | System clock, any IANA timezone |
@@ -96,6 +104,13 @@ returns a string, and a `Tool(...)` entry added to `ALL_TOOLS` in `app/tools/__i
 - **SQL safety in depth**: a dedicated `agent_readonly` role with SELECT on
   `analytics` only, `default_transaction_read_only`, a READ ONLY transaction, a 5 s
   statement timeout, a single-statement check and a 100-row cap.
+- **Hybrid retrieval**: keyword search catches exact names and codes, embeddings
+  catch paraphrases. Reciprocal-rank fusion (`1/(60+rank)`) merges the two lists
+  without score calibration. If the embedding server is down, search falls back to
+  keywords, and documents saved meanwhile get vectors at the next startup.
+- **One tool layer, two model formats**: tools are pydantic models that render to
+  Claude's `input_schema` or chat-completions `parameters`. `execute_tool` (timeouts,
+  metrics, error capture) is shared by both agents.
 - **Graceful degradation**: if Redis is down, rate limiting fails open; tool failures
   become `is_error` results and the model can recover or explain.
 

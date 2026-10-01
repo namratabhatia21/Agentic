@@ -1,5 +1,6 @@
 """HTTP API: chat over Server-Sent Events, conversation history, health and metrics."""
 
+import asyncio
 import json
 import logging
 import uuid
@@ -8,19 +9,24 @@ from pathlib import Path
 
 import anthropic
 import httpx
+import httpx2
 import redis.asyncio as aioredis
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
+from huggingface_hub.errors import HfHubHTTPError
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, Field
 
 from app import db, metrics
 from app.agent import Agent
 from app.config import Settings, get_settings
-from app.llm import build_client
+from app.embeddings import Embedder
+from app.hf_agent import HFAgent
+from app.llm import build_client, build_hf_client, conversation_format, model_name, server_tools
 from app.logging_setup import configure_logging
-from app.tools import ALL_TOOLS, ToolContext
+from app.tools import ToolContext, available_tools
+from app.tools.knowledge import add_document
 
 log = logging.getLogger("agentic")
 STATIC_DIR = Path(__file__).parent / "static"
@@ -38,8 +44,13 @@ async def lifespan(app: FastAPI):
         follow_redirects=True,
     )
     app.state.redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+    app.state.hf = build_hf_client(settings)
     app.state.db = await db.create_pool(settings.database_url, min_size=1, max_size=10)
-    await db.migrate(app.state.db)
+    vector_ok = await db.migrate(app.state.db, settings.embedding_dim)
+    embedder = Embedder(settings)
+    app.state.embedder = embedder if (vector_ok and embedder.enabled) else None
+    if app.state.embedder is not None:
+        app.state.backfill = asyncio.create_task(_backfill(app.state.db, app.state.embedder))
     try:
         app.state.readonly_db = await db.create_pool(
             settings.readonly_database_url, min_size=1, max_size=5
@@ -48,7 +59,12 @@ async def lifespan(app: FastAPI):
         # The analytics role is created by db/init; without it only the SQL tools degrade.
         log.warning("read-only analytics database unavailable; SQL tools disabled")
         app.state.readonly_db = None
-    log.info("started provider=%s model=%s", settings.llm_provider, settings.model_id)
+    log.info(
+        "started provider=%s model=%s semantic_search=%s",
+        settings.llm_provider,
+        model_name(settings),
+        app.state.embedder is not None,
+    )
     try:
         yield
     finally:
@@ -57,6 +73,30 @@ async def lifespan(app: FastAPI):
         await app.state.db.close()
         await app.state.redis.aclose()
         await app.state.http.aclose()
+
+
+async def _backfill(pool, embedder) -> None:
+    # Give the embeddings server time to load its model on a cold start.
+    for delay in (0, 15, 30, 60, 120):
+        await asyncio.sleep(delay)
+        try:
+            done = await db.backfill_embeddings(pool, embedder)
+            log.info("embedding backfill: %d documents", done)
+            return
+        except Exception as e:
+            log.warning("embedding backfill failed: %s", e)
+
+
+def tool_context(state) -> ToolContext:
+    return ToolContext(
+        settings=state.settings,
+        http=state.http,
+        redis=state.redis,
+        db=state.db,
+        readonly_db=state.readonly_db,
+        hf=state.hf,
+        embedder=state.embedder,
+    )
 
 
 app = FastAPI(title="Agentic", version="0.1.0", lifespan=lifespan)
@@ -110,9 +150,17 @@ def sse(event: dict) -> str:
 @app.post("/api/chat")
 async def chat(body: ChatRequest, request: Request, _: str = Depends(rate_limit)):
     state = request.app.state
-    conversation_id, _created = await db.ensure_conversation(
-        state.db, body.conversation_id, body.message
-    )
+    fmt = conversation_format(state.settings)
+    try:
+        conversation_id = await db.ensure_conversation(
+            state.db, body.conversation_id, body.message, fmt
+        )
+    except db.ConversationFormatError as e:
+        raise HTTPException(
+            status_code=409,
+            detail=f"This conversation was created with a different model provider ({e}); "
+            "start a new chat.",
+        ) from e
     if conversation_id is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -121,14 +169,8 @@ async def chat(body: ChatRequest, request: Request, _: str = Depends(rate_limit)
         raise HTTPException(status_code=409, detail="A reply is already in progress")
 
     history = await db.load_history(state.db, conversation_id)
-    ctx = ToolContext(
-        settings=state.settings,
-        http=state.http,
-        redis=state.redis,
-        db=state.db,
-        readonly_db=state.readonly_db,
-    )
-    agent = Agent(state.llm, state.settings, ctx)
+    agent_cls = HFAgent if fmt == "openai" else Agent
+    agent = agent_cls(state.llm, state.settings, tool_context(state))
 
     async def event_stream():
         new_messages: list[dict] = []
@@ -148,6 +190,12 @@ async def chat(body: ChatRequest, request: Request, _: str = Depends(rate_limit)
             log.error("anthropic api error status=%s body=%s", e.status_code, e.message)
             yield sse({"type": "error", "message": f"Model API error ({e.status_code})."})
         except anthropic.APIConnectionError:
+            yield sse({"type": "error", "message": "Could not reach the model API."})
+        except HfHubHTTPError as e:
+            status = e.response.status_code if e.response is not None else "?"
+            log.error("hugging face error status=%s: %s", status, e)
+            yield sse({"type": "error", "message": f"Hugging Face API error ({status})."})
+        except httpx2.TransportError:
             yield sse({"type": "error", "message": "Could not reach the model API."})
         except Exception:
             log.exception("chat turn failed")
@@ -173,24 +221,84 @@ async def get_conversation(
         raise HTTPException(status_code=404, detail="Conversation not found")
     out = []
     for m in history:
-        if isinstance(m["content"], str):
-            out.append({"role": m["role"], "text": m["content"]})
+        if m["role"] not in ("user", "assistant"):
             continue
-        text = "".join(b.get("text", "") for b in m["content"] if b.get("type") == "text")
+        content = m.get("content")
+        if isinstance(content, str):
+            text = content
+        else:
+            text = "".join(b.get("text", "") for b in content or [] if b.get("type") == "text")
         if text:
             out.append({"role": m["role"], "text": text})
     return {"id": str(conversation_id), "messages": out}
 
 
+class DocumentIn(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    content: str = Field(min_length=1, max_length=200_000)
+    source: str = ""
+
+
+@app.post("/api/documents", status_code=201)
+async def add_documents(
+    docs: list[DocumentIn], request: Request, _: str = Depends(require_api_key)
+):
+    """Bulk-load the knowledge base. Long texts are split into ~1500-character chunks."""
+    if len(docs) > 200:
+        raise HTTPException(status_code=413, detail="At most 200 documents per request")
+    ctx = tool_context(request.app.state)
+    ids = []
+    for doc in docs:
+        chunks = _chunk(doc.content)
+        for i, chunk in enumerate(chunks, 1):
+            title = doc.title if len(chunks) == 1 else f"{doc.title} (part {i}/{len(chunks)})"
+            ids.append(await add_document(ctx, title, chunk, doc.source))
+    return {"ids": ids, "semantic": request.app.state.embedder is not None}
+
+
+def _chunk(text: str, size: int = 1500) -> list[str]:
+    paragraphs, chunks, current = text.split("\n\n"), [], ""
+    for p in paragraphs:
+        while len(p) > size:  # hard-split very long paragraphs
+            if current:
+                chunks.append(current)
+                current = ""
+            chunks.append(p[:size])
+            p = p[size:]
+        if current and len(current) + len(p) + 2 > size:
+            chunks.append(current)
+            current = p
+        else:
+            current = f"{current}\n\n{p}" if current else p
+    if current.strip():
+        chunks.append(current)
+    return chunks or [text]
+
+
+@app.get("/api/images/{image_id}.png")
+async def get_image(image_id: uuid.UUID, request: Request):
+    # Image ids are random UUIDs, so links are unguessable (the browser <img> tag
+    # can't send X-API-Key).
+    png = await request.app.state.db.fetchval("SELECT png FROM images WHERE id = $1", image_id)
+    if png is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return Response(
+        png, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"}
+    )
+
+
 @app.get("/api/tools")
 async def list_tools(request: Request):
-    from app.llm import server_tools
-
+    state = request.app.state
+    settings = state.settings
     return {
-        "client_tools": [{"name": t.name, "description": t.description} for t in ALL_TOOLS],
-        "server_tools": [t["name"] for t in server_tools(request.app.state.settings)],
-        "provider": request.app.state.settings.llm_provider,
-        "model": request.app.state.settings.model_id,
+        "client_tools": [
+            {"name": t.name, "description": t.description} for t in available_tools(settings)
+        ],
+        "server_tools": [t["name"] for t in server_tools(settings)],
+        "provider": settings.llm_provider,
+        "model": model_name(settings),
+        "semantic_search": state.embedder is not None,
     }
 
 

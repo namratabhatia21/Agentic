@@ -16,7 +16,7 @@ from app import metrics
 from app.config import Settings
 from app.llm import request_extras, server_tools
 from app.prompts import SYSTEM_PROMPT
-from app.tools import ALL_TOOLS, TOOLS_BY_NAME, ToolContext
+from app.tools import ToolContext, available_tools, execute_tool
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +34,9 @@ class Agent:
         self.client = client
         self.settings = settings
         self.ctx = ctx
-        self.tool_defs = [t.definition() for t in ALL_TOOLS] + server_tools(settings)
+        self.tool_defs = [t.definition() for t in available_tools(settings)] + server_tools(
+            settings
+        )
 
     def _request(self, messages: list[dict]) -> dict:
         return {
@@ -135,7 +137,9 @@ class Agent:
                 return
 
             new_messages.append(assistant)
-            results = await asyncio.gather(*(self._run_tool(b) for b in tool_uses))
+            results = await asyncio.gather(
+                *(execute_tool(b.name, b.input, self.ctx) for b in tool_uses)
+            )
             for block, (content, is_error) in zip(tool_uses, results, strict=True):
                 yield {
                     "type": "tool_result",
@@ -160,24 +164,6 @@ class Agent:
                 }
             )
             messages = history + new_messages
-
-    async def _run_tool(self, block: Any) -> tuple[str, bool]:
-        tool = TOOLS_BY_NAME.get(block.name)
-        if tool is None:
-            return f"Unknown tool: {block.name}", True
-        started = time.perf_counter()
-        try:
-            content, is_error = await asyncio.wait_for(
-                tool.run(block.input, self.ctx), timeout=self.settings.tool_http_timeout * 2
-            )
-        except TimeoutError:
-            content, is_error = "Tool timed out", True
-        except Exception as e:  # never let one tool failure kill the turn
-            log.exception("tool %s crashed", block.name)
-            content, is_error = f"Tool failed: {type(e).__name__}", True
-        metrics.TOOL_CALLS.labels(tool=block.name, status="error" if is_error else "ok").inc()
-        metrics.TOOL_LATENCY.labels(tool=block.name).observe(time.perf_counter() - started)
-        return content, is_error
 
 
 def _translate(event: Any) -> dict | None:

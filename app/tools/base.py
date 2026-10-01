@@ -19,6 +19,8 @@ class ToolContext:
     redis: Any | None = None  # redis.asyncio.Redis
     db: Any | None = None  # asyncpg.Pool (read/write, app role)
     readonly_db: Any | None = None  # asyncpg.Pool (SELECT-only role)
+    hf: Any | None = None  # huggingface_hub.AsyncInferenceClient (None without HF_TOKEN)
+    embedder: Any | None = None  # app.embeddings.Embedder, None if semantic search is off
 
     async def cached_get_json(self, url: str, params: dict | None = None) -> Any:
         """GET a JSON URL, caching the body in Redis for tool_cache_ttl seconds."""
@@ -57,20 +59,36 @@ class Tool:
     description: str
     input_model: type[BaseModel]
     handler: Callable[[Any, ToolContext], Awaitable[str]]
+    requires_hf_token: bool = False
 
-    def definition(self) -> dict:
+    def json_schema(self) -> dict:
         schema = self.input_model.model_json_schema()
         schema.pop("title", None)
         for prop in schema.get("properties", {}).values():
             prop.pop("title", None)
         schema["additionalProperties"] = False
+        return schema
+
+    def definition(self) -> dict:
+        """Claude (Messages API) tool definition."""
         return {
             "name": self.name,
             "description": self.description,
-            "input_schema": schema,
+            "input_schema": self.json_schema(),
             # Stream tool inputs as they are generated. The API no longer validates
             # them, so run() validates against the pydantic model before executing.
             "eager_input_streaming": True,
+        }
+
+    def openai_definition(self) -> dict:
+        """Chat-completions tool definition, used for Hugging Face models."""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": self.json_schema(),
+            },
         }
 
     async def run(self, raw_input: Any, ctx: ToolContext) -> tuple[str, bool]:

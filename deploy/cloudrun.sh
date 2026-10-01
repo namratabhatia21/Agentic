@@ -3,6 +3,7 @@
 # with Claude served from Vertex AI so model usage is billed to your GCP account.
 #
 #   PROJECT_ID=my-project ./deploy/cloudrun.sh
+#   PROJECT_ID=my-project HF_TOKEN=hf_... ./deploy/cloudrun.sh   # + Hugging Face features
 #
 # Re-runnable: existing resources are reused.
 set -euo pipefail
@@ -66,6 +67,15 @@ gcloud artifacts repositories describe "$REPO" --location "$REGION" >/dev/null 2
   gcloud artifacts repositories create "$REPO" --repository-format docker --location "$REGION"
 gcloud builds submit --tag "$IMAGE" .
 
+# Optional Hugging Face token: enables HF tools and hosted embeddings (semantic search).
+SECRETS="API_KEYS=agentic-api-keys:latest"
+if [[ -n "${HF_TOKEN:-}" ]]; then
+  gcloud secrets describe agentic-hf-token >/dev/null 2>&1 || \
+    printf '%s' "$HF_TOKEN" | gcloud secrets create agentic-hf-token --data-file=- \
+      --replication-policy=automatic
+  SECRETS="${SECRETS},HF_TOKEN=agentic-hf-token:latest"
+fi
+
 echo "==> Deploy Cloud Run"
 SOCKET="/cloudsql/${CONN_NAME}"
 gcloud run deploy "$SERVICE" \
@@ -77,7 +87,7 @@ gcloud run deploy "$SERVICE" \
   --set-env-vars "REDIS_URL=redis://${REDIS_HOST}:6379/0" \
   --set-env-vars "DATABASE_URL=postgresql://agentic:${DB_PASSWORD}@/agentic?host=${SOCKET}" \
   --set-env-vars "READONLY_DATABASE_URL=postgresql://agent_readonly:${RO_PASSWORD}@/agentic?host=${SOCKET}" \
-  --set-secrets "API_KEYS=agentic-api-keys:latest"
+  --set-secrets "$SECRETS"
 
 cat <<MSG
 

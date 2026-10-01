@@ -1,18 +1,24 @@
-"""Claude client factory.
+"""Model client factory.
 
-The same agent code runs against three backends, so you can pay for model usage
-with whichever credits you have: Anthropic Console credits, Google Cloud credits
-(Vertex AI) or AWS credits (Bedrock).
+Claude can be reached through three backends, so you can pay with whichever credits
+you have: Anthropic Console (Claude API), Google Cloud (Vertex AI) or AWS (Bedrock).
+LLM_PROVIDER=huggingface instead runs an open-weight model through Hugging Face
+Inference Providers.
 """
 
 from typing import Any
 
 import anthropic
+from huggingface_hub import AsyncInferenceClient
 
 from app.config import Settings
 
 
 def build_client(settings: Settings) -> Any:
+    if settings.llm_provider == "huggingface":
+        if not settings.hf_token:
+            raise RuntimeError("HF_TOKEN is required when LLM_PROVIDER=huggingface")
+        return build_hf_client(settings)
     if settings.llm_provider == "vertex":
         if not settings.gcp_project_id:
             raise RuntimeError("GCP_PROJECT_ID is required when LLM_PROVIDER=vertex")
@@ -36,7 +42,7 @@ def server_tools(settings: Settings) -> list[dict]:
     if settings.llm_provider == "vertex":
         # Vertex offers only the basic web search variant and no web fetch.
         return [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}]
-    # Bedrock has no server-side web tools; the client tools still cover live data.
+    # Bedrock and open models have no server-side web tools; client tools cover live data.
     return []
 
 
@@ -50,3 +56,22 @@ def request_extras(settings: Settings) -> dict:
             "extra_body": {"fallbacks": "default"},
         }
     return {}
+
+
+def build_hf_client(settings: Settings) -> AsyncInferenceClient | None:
+    """Client for Hugging Face Inference Providers (chat, images, classification)."""
+    if not settings.hf_token:
+        return None
+    return AsyncInferenceClient(
+        provider=settings.hf_provider, api_key=settings.hf_token, timeout=120
+    )
+
+
+def conversation_format(settings: Settings) -> str:
+    return "openai" if settings.llm_provider == "huggingface" else "anthropic"
+
+
+def model_name(settings: Settings) -> str:
+    if settings.llm_provider == "huggingface":
+        return settings.hf_chat_model
+    return settings.model_id

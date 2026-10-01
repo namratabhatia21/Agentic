@@ -87,7 +87,8 @@ const md = (t) => DOMPurify.sanitize(marked.parse(t));
 
 fetch("/api/tools").then(r => r.json()).then(d => {
   document.getElementById("meta").textContent =
-    `${d.model} via ${d.provider} · ${d.client_tools.length + d.server_tools.length} tools`;
+    `${d.model} via ${d.provider} · ${d.client_tools.length + d.server_tools.length} tools` +
+    (d.semantic_search ? " · semantic search" : "");
 }).catch(() => {});
 
 document.getElementById("new").onclick = () => location.reload();

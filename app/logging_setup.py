@@ -20,3 +20,6 @@ def configure_logging(level: str) -> None:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())
     logging.basicConfig(level=level.upper(), handlers=[handler], force=True)
+    # Per-request lines from the HTTP clients are noise at INFO.
+    for name in ("httpx", "httpx2", "huggingface_hub"):
+        logging.getLogger(name).setLevel(max(logging.WARNING, logging.getLogger().level))

@@ -70,6 +70,29 @@ arXiv, Hacker News, Wikipedia, weather and exchange-rate tools.
    This option has every feature: dynamic web search, web fetch, and automatic
    refusal fallback.
 
+## Option D: Hugging Face credits → open-weight models
+
+1. Create a token at huggingface.co/settings/tokens. Fine-grained, with
+   **Make calls to Inference Providers** enabled.
+2. Free accounts get a small monthly inference allowance, and HF PRO includes more.
+   After that, usage is billed by Hugging Face at the provider's rates, or to your
+   own provider keys if you add them in HF settings.
+3. Configure:
+   ```env
+   LLM_PROVIDER=huggingface
+   HF_TOKEN=hf_...
+   HF_CHAT_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507   # any model with tool calling
+   ```
+   Browse models that support tool use at huggingface.co/models?inference_provider=all.
+
+The same `HF_TOKEN` also turns on the image-generation and classification tools with
+any provider. Semantic search needs no credits: the `embeddings` service runs the
+Hugging Face model locally on CPU.
+
+On Cloud Run you can skip the TEI service: leave `EMBEDDINGS_URL` empty, set `HF_TOKEN`,
+and embeddings are computed by Hugging Face instead. You can also deploy the TEI image as
+a second Cloud Run service and point `EMBEDDINGS_URL` at it.
+
 ## Keeping the bill low
 
 - `EFFORT=low` or `medium` (the default) costs much less than `high`/`xhigh` for
