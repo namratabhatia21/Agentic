@@ -87,6 +87,10 @@ you can measure it. Include an ablation (with/without hard negatives, distillati
 short write-up on when LIME is and isn't trustworthy. That write-up is your
 strongest portfolio artifact.
 
+> **Update:** Repo 4 is now the Cloud Architecture Advisor (AWS first, then GCP, Azure
+> and OSS). The full product plan is in [CLOUD_ADVISOR_PLAN.md](CLOUD_ADVISOR_PLAN.md).
+> The section below is the earlier static reference-architecture idea, kept for context.
+
 ## Repo 4: `genai-cloud-reference-architecture` (weeks 10-12)
 
 **Goal:** a researched, deployable reference architecture, not a diagram only.
