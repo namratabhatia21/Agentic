@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66;
+    --border: #e3e3de; --accent: #2f5bd3; --user: #eef2fd; --tool: #f3f1ea; --err: #b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --panel: #1e1e1c; --text: #ecece8; --muted: #9a9a93;
+      --border: #33332f; --accent: #7d9bf0; --user: #232a3d; --tool: #26251f; --err: #f97066;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { max-width: 860px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; padding: 0 16px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 18px; margin: 0; }
+  header .meta { color: var(--muted); font-size: 13px; }
+  header button { background: none; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  #log { flex: 1; padding: 16px 0 120px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { padding: 12px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--border); overflow-wrap: anywhere; }
+  .msg.user { background: var(--user); align-self: flex-end; max-width: 85%; white-space: pre-wrap; }
+  .msg pre { overflow-x: auto; background: var(--tool); padding: 10px; border-radius: 8px; }
+  .msg table { border-collapse: collapse; display: block; overflow-x: auto; }
+  .msg td, .msg th { border: 1px solid var(--border); padding: 4px 8px; }
+  details.step { background: var(--tool); border-radius: 8px; padding: 6px 10px; margin: 6px 0; font-size: 13px; color: var(--muted); }
+  details.step summary { cursor: pointer; }
+  details.step pre { white-space: pre-wrap; margin: 6px 0 0; font-size: 12px; }
+  .err { color: var(--err); }
+  form { position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, var(--bg) 30%); padding: 24px 16px 16px; }
+  .composer { max-width: 828px; margin: 0 auto; display: flex; gap: 8px; }
+  textarea { flex: 1; resize: none; min-height: 48px; max-height: 200px; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; }
+  form button { border: 0; border-radius: 12px; padding: 0 18px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+  form button:disabled { opacity: .5; cursor: default; }
+  .empty { color: var(--muted); text-align: center; margin-top: 15vh; }
+  .empty li { list-style: none; margin: 6px 0; cursor: pointer; text-decoration: underline dotted; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div><h1>Agentic</h1><div class="meta" id="meta">loading…</div></div>
+    <div><button id="key" type="button">API key</button> <button id="new" type="button">New chat</button></div>
+  </header>
+  <main id="log">
+    <div class="empty" id="empty">
+      <p>Ask anything. The assistant can search the web, arXiv, Wikipedia, Hacker News, weather, exchange rates, your knowledge base and the analytics database.</p>
+      <ul>
+        <li>What are the newest arXiv papers on agentic RAG? Summarise the top 3.</li>
+        <li>Which region had the highest revenue in the analytics database last quarter?</li>
+        <li>Convert 2,500 EUR to INR and USD at today's rates.</li>
+        <li>What's on the Hacker News front page right now?</li>
+      </ul>
+    </div>
+  </main>
+</div>
+<form id="form">
+  <div class="composer">
+    <textarea id="input" placeholder="Message Agentic…" rows="1"></textarea>
+    <button id="send">Send</button>
+  </div>
+</form>
+<script>
+const log = document.getElementById("log");
+const input = document.getElementById("input");
+const send = document.getElementById("send");
+let conversationId = null;
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const headers = () => {
+  const h = { "Content-Type": "application/json" };
+  const key = store.get("agentic_api_key");
+  if (key) h["X-API-Key"] = key;
+  return h;
+};
+const md = (t) => DOMPurify.sanitize(marked.parse(t));
+
+fetch("/api/tools").then(r => r.json()).then(d => {
+  document.getElementById("meta").textContent =
+    `${d.model} via ${d.provider} · ${d.client_tools.length + d.server_tools.length} tools`;
+}).catch(() => {});
+
+document.getElementById("new").onclick = () => location.reload();
+document.getElementById("key").onclick = () => {
+  const v = prompt("X-API-Key (leave empty if auth is disabled)", store.get("agentic_api_key") || "");
+  if (v !== null) store.set("agentic_api_key", v);
+};
+document.querySelectorAll(".empty li").forEach(li => li.onclick = () => { input.value = li.textContent; input.focus(); });
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); document.getElementById("form").requestSubmit(); }
+});
+
+function add(cls, html) {
+  document.getElementById("empty")?.remove();
+  const el = document.createElement("div");
+  el.className = "msg " + cls;
+  if (html !== undefined) el.innerHTML = html;
+  log.appendChild(el);
+  window.scrollTo(0, document.body.scrollHeight);
+  return el;
+}
+
+document.getElementById("form").onsubmit = async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  send.disabled = true;
+  add("user").textContent = text;
+  const bot = add("bot");
+  let answer = "", thinking = null, textEl = null;
+  const steps = {};
+  const step = (summary) => {
+    const d = document.createElement("details");
+    d.className = "step";
+    d.innerHTML = `<summary></summary><pre></pre>`;
+    d.querySelector("summary").textContent = summary;
+    bot.insertBefore(d, textEl);
+    return d;
+  };
+  const ensureText = () => { if (!textEl) { textEl = document.createElement("div"); bot.appendChild(textEl); } };
+  ensureText();
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST", headers: headers(),
+      body: JSON.stringify({ message: text, conversation_id: conversationId }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || res.statusText);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const chunk = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        if (!chunk.startsWith("data: ")) continue;
+        const ev = JSON.parse(chunk.slice(6));
+        switch (ev.type) {
+          case "conversation": conversationId = ev.id; break;
+          case "thinking":
+            if (!thinking) thinking = step("Thinking…");
+            thinking.querySelector("pre").textContent += ev.text;
+            break;
+          case "text":
+            thinking = null;
+            answer += ev.text; textEl.innerHTML = md(answer); break;
+          case "tool_call":
+            thinking = null;
+            steps[ev.id] = step(`🔧 ${ev.name}${ev.server ? " (hosted)" : ""} ${JSON.stringify(ev.input)}`.slice(0, 160));
+            steps[ev.id].querySelector("pre").textContent = JSON.stringify(ev.input, null, 2);
+            break;
+          case "tool_result": {
+            const d = steps[ev.id];
+            if (d) {
+              d.querySelector("summary").textContent += ev.is_error ? " ✗" : " ✓";
+              if (ev.preview) d.querySelector("pre").textContent += "\n\n→ " + ev.preview;
+            }
+            break;
+          }
+          case "notice": step("ℹ " + ev.message); break;
+          case "refusal":
+          case "error": add("bot err").textContent = ev.message; break;
+        }
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+    }
+  } catch (err) {
+    add("bot err").textContent = "Error: " + err.message;
+  } finally {
+    send.disabled = false;
+    input.focus();
+  }
+};
+</script>
+</body>
+</html>

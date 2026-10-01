@@ -1,0 +1,105 @@
+name: agentic
+
+x-api-env: &api-env
+  LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+  MODEL: ${MODEL:-claude-opus-5-5}
+  EFFORT: ${EFFORT:-medium}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
+  GCP_REGION: ${GCP_REGION:-global}
+  GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+  AWS_REGION: ${AWS_REGION:-us-east-1}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  DATABASE_URL: postgresql://agentic:${POSTGRES_PASSWORD:-change-me}@postgres:5432/agentic
+  READONLY_DATABASE_URL: postgresql://agent_readonly:${READONLY_PASSWORD:-change-me-too}@postgres:5432/agentic
+  REDIS_URL: redis://redis:6379/0
+  API_KEYS: ${API_KEYS:-}
+  RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-20}
+  CORS_ORIGINS: ${CORS_ORIGINS:-*}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    build: .
+    image: agentic-api:latest
+    environment: *api-env
+    volumes:
+      # Only needed for LLM_PROVIDER=vertex when running locally (gcloud ADC).
+      - ${GCLOUD_CONFIG_DIR:-./.gcloud-empty}:/gcloud:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 1g
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agentic
+      POSTGRES_USER: agentic
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      READONLY_PASSWORD: ${READONLY_PASSWORD:-change-me-too}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentic -d agentic"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # --- optional observability stack: docker compose --profile monitoring up ---
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    profiles: ["monitoring"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on: [api]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    profiles: ["monitoring"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
+
+volumes:
+  pgdata:
+  redisdata:
