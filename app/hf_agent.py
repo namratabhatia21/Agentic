@@ -1,8 +1,9 @@
-"""Agent loop for open-weight models on Hugging Face Inference Providers.
+"""Agent loop for open-weight models: Hugging Face Inference Providers or self-hosted.
 
 Uses the OpenAI-compatible chat-completions format (messages with `tool_calls`,
-`tool` role results) through huggingface_hub's AsyncInferenceClient. Emits the same
-UI events as the Claude agent, so the frontend and API don't care which runs.
+`tool` role results) through huggingface_hub's AsyncInferenceClient, which also talks
+to any self-hosted OpenAI-compatible server (Ollama, vLLM, TGI). Emits the same UI
+events as the Claude agent, so the frontend and API don't care which runs.
 """
 
 import asyncio
@@ -13,6 +14,7 @@ from typing import Any
 
 from app import metrics
 from app.config import Settings
+from app.llm import model_name
 from app.prompts import SYSTEM_PROMPT
 from app.tools import ToolContext, available_tools, execute_tool
 
@@ -47,7 +49,7 @@ class HFAgent:
 
             stream = await self.client.chat_completion(
                 messages,
-                model=self.settings.hf_chat_model,
+                model=model_name(self.settings),
                 tools=self.tool_defs,
                 tool_choice="auto",
                 max_tokens=self.settings.hf_max_tokens,

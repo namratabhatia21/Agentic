@@ -52,12 +52,12 @@
   </header>
   <main id="log">
     <div class="empty" id="empty">
-      <p>Ask anything. The assistant can search the web, arXiv, Wikipedia, Hacker News, weather, exchange rates, your knowledge base and the analytics database.</p>
+      <p>Ask anything. The assistant can search arXiv, Wikipedia, Hacker News and the Hugging Face Hub, check weather and exchange rates, and query your knowledge base and the analytics database.</p>
       <ul>
         <li>What are the newest arXiv papers on agentic RAG? Summarise the top 3.</li>
         <li>Which region had the highest revenue in the analytics database last quarter?</li>
         <li>Convert 2,500 EUR to INR and USD at today's rates.</li>
-        <li>What's on the Hacker News front page right now?</li>
+        <li>What are the trending open-source text-generation models on Hugging Face this week?</li>
       </ul>
     </div>
   </main>
@@ -87,8 +87,10 @@ const md = (t) => DOMPurify.sanitize(marked.parse(t));
 
 fetch("/api/tools").then(r => r.json()).then(d => {
   document.getElementById("meta").textContent =
-    `${d.model} via ${d.provider} · ${d.client_tools.length + d.server_tools.length} tools` +
-    (d.semantic_search ? " · semantic search" : "");
+    `${d.model} (${d.open_source ? "open-source" : "Claude"}, ${d.provider})` +
+    ` · ${d.client_tools.length + d.server_tools.length} tools` +
+    (d.semantic_search ? " · semantic search" : "") +
+    (d.configured ? "" : " · ⚠ model not configured");
 }).catch(() => {});
 
 document.getElementById("new").onclick = () => location.reload();

@@ -1,9 +1,10 @@
 """Model client factory.
 
-Claude can be reached through three backends, so you can pay with whichever credits
-you have: Anthropic Console (Claude API), Google Cloud (Vertex AI) or AWS (Bedrock).
-LLM_PROVIDER=huggingface instead runs an open-weight model through Hugging Face
-Inference Providers.
+Open-source models (default):
+- huggingface: an open-weight model served by Hugging Face Inference Providers.
+- local:       an open-weight model you host yourself (Ollama, vLLM, TGI).
+Claude (optional), through whichever cloud your credits are on: Anthropic Console
+(Claude API), Google Cloud (Vertex AI) or AWS (Bedrock).
 """
 
 from typing import Any
@@ -14,10 +15,21 @@ from huggingface_hub import AsyncInferenceClient
 from app.config import Settings
 
 
+class ProviderNotConfigured(RuntimeError):
+    """The selected provider is missing credentials; the API reports it per request."""
+
+
 def build_client(settings: Settings) -> Any:
+    if settings.llm_provider == "local":
+        return AsyncInferenceClient(
+            base_url=settings.local_llm_url, api_key=settings.local_api_key, timeout=600
+        )
     if settings.llm_provider == "huggingface":
         if not settings.hf_token:
-            raise RuntimeError("HF_TOKEN is required when LLM_PROVIDER=huggingface")
+            raise ProviderNotConfigured(
+                "LLM_PROVIDER=huggingface needs HF_TOKEN (free at "
+                "huggingface.co/settings/tokens), or use LLM_PROVIDER=local."
+            )
         return build_hf_client(settings)
     if settings.llm_provider == "vertex":
         if not settings.gcp_project_id:
@@ -68,10 +80,12 @@ def build_hf_client(settings: Settings) -> AsyncInferenceClient | None:
 
 
 def conversation_format(settings: Settings) -> str:
-    return "openai" if settings.llm_provider == "huggingface" else "anthropic"
+    return "openai" if settings.uses_open_model else "anthropic"
 
 
 def model_name(settings: Settings) -> str:
     if settings.llm_provider == "huggingface":
         return settings.hf_chat_model
+    if settings.llm_provider == "local":
+        return settings.local_model
     return settings.model_id

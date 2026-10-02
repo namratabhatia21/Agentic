@@ -11,12 +11,15 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # --- LLM provider -------------------------------------------------------
+    # Open-source models:
+    # "huggingface": open-weight model (Qwen, Llama, ...) via HF Inference Providers (HF_TOKEN)
+    # "local":       open-weight model you host - Ollama (compose profile), vLLM or TGI
+    # Claude (optional):
     # "anthropic": Claude API (billed to Anthropic Console credits)
     # "vertex":    Claude on Google Cloud Vertex AI (billed to your GCP account)
     # "bedrock":   Claude on Amazon Bedrock (billed to your AWS account)
-    # "huggingface": an open-weight model (Qwen, Llama, ...) via Hugging Face Inference Providers
-    llm_provider: Literal["anthropic", "vertex", "bedrock", "huggingface"] = "anthropic"
-    model: str = "claude-opus-5-5"
+    llm_provider: Literal["huggingface", "local", "anthropic", "vertex", "bedrock"] = "huggingface"
+    model: str = "claude-opus-5-5"  # only used by the Claude providers
     effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
     max_tokens: int = 64000
     max_agent_steps: int = 12
@@ -47,6 +50,11 @@ class Settings(BaseSettings):
     # bge models expect this instruction in front of search queries (not documents).
     embedding_query_prefix: str = "Represent this sentence for searching relevant passages: "
 
+    # Self-hosted open model: any OpenAI-compatible server (Ollama, vLLM, TGI).
+    local_llm_url: str = "http://ollama:11434/v1"
+    local_model: str = "qwen3:8b"
+    local_api_key: str | None = None
+
     # --- Infrastructure -----------------------------------------------------
     database_url: str = "postgresql://agentic:agentic@localhost:5432/agentic"
     readonly_database_url: str = "postgresql://agent_readonly:agent_readonly@localhost:5432/agentic"
@@ -65,6 +73,10 @@ class Settings(BaseSettings):
     @property
     def api_key_set(self) -> set[str]:
         return {k.strip() for k in self.api_keys.split(",") if k.strip()}
+
+    @property
+    def uses_open_model(self) -> bool:
+        return self.llm_provider in ("huggingface", "local")
 
     @property
     def model_id(self) -> str:

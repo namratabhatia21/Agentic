@@ -69,7 +69,7 @@ class FakeClient:
 @pytest.fixture
 async def ctx():
     async with httpx.AsyncClient() as http:
-        yield ToolContext(settings=Settings(), http=http)
+        yield ToolContext(settings=Settings(llm_provider="anthropic"), http=http)
 
 
 async def collect(agent, history, text):
@@ -102,7 +102,7 @@ async def test_tool_loop_runs_tools_in_parallel_and_finishes(ctx):
             message([{"type": "text", "text": "42 and 1024."}], "end_turn"),
         ]
     )
-    agent = Agent(client, Settings(), ctx)
+    agent = Agent(client, Settings(llm_provider="anthropic"), ctx)
     events, new_messages = await collect(agent, [], "compute")
 
     types = [e["type"] for e in events]
@@ -137,7 +137,9 @@ async def test_unknown_tool_and_bad_input_return_errors(ctx):
             message([{"type": "text", "text": "Sorry."}], "end_turn"),
         ]
     )
-    events, new_messages = await collect(Agent(client, Settings(), ctx), [], "hi")
+    events, new_messages = await collect(
+        Agent(client, Settings(llm_provider="anthropic"), ctx), [], "hi"
+    )
     results = new_messages[2]["content"]
     assert all(r.get("is_error") for r in results)
     assert events[-1]["type"] == "done"
@@ -145,7 +147,7 @@ async def test_unknown_tool_and_bad_input_return_errors(ctx):
 
 async def test_refusal_is_not_persisted(ctx):
     client = FakeClient([message([], "refusal")])
-    events, _ = await collect(Agent(client, Settings(), ctx), [], "bad")
+    events, _ = await collect(Agent(client, Settings(llm_provider="anthropic"), ctx), [], "bad")
     assert events[-1]["type"] == "refusal"
     assert not any(e["type"] == "done" for e in events)
 
@@ -155,7 +157,7 @@ async def test_step_limit(ctx):
         [{"type": "tool_use", "id": "t", "name": "calculator", "input": {"expression": "1"}}],
         "tool_use",
     )
-    settings = Settings(max_agent_steps=3)
+    settings = Settings(llm_provider="anthropic", max_agent_steps=3)
     client = FakeClient([loop_msg] * 5)
     events, _ = await collect(Agent(client, settings, ctx), [], "loop")
     assert events[-1]["type"] == "error"
@@ -165,7 +167,10 @@ async def test_step_limit(ctx):
 def test_provider_specific_tools():
     from app.llm import request_extras, server_tools
 
-    assert {t["name"] for t in server_tools(Settings())} == {"web_search", "web_fetch"}
+    assert {t["name"] for t in server_tools(Settings(llm_provider="anthropic"))} == {
+        "web_search",
+        "web_fetch",
+    }
     vertex = Settings(llm_provider="vertex")
     assert [t["type"] for t in server_tools(vertex)] == ["web_search_20250305"]
     assert request_extras(vertex) == {}

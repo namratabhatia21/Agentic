@@ -3,8 +3,10 @@
 Running the chatbot costs model tokens plus servers and a database. Both can be paid
 with credits on the platform you deploy to.
 
-The app can call Claude through three platforms. Pick the one where your credits are
-by setting `LLM_PROVIDER`. No code changes needed.
+The default model is open-source: Qwen3 via Hugging Face (Option D) or self-hosted with
+`LLM_PROVIDER=local`, which costs nothing beyond your own hardware. If you want Claude
+instead, it can run through three platforms. Pick the one where your credits are by
+setting `LLM_PROVIDER`. No code changes needed.
 
 ## Option A: Google Cloud credits → Vertex AI (+ Cloud Run)
 

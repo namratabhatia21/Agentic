@@ -219,3 +219,40 @@ def test_openai_tool_definition_shape():
     assert d["type"] == "function"
     assert d["function"]["parameters"]["required"] == ["expression"]
     json.dumps(d)
+
+
+def test_open_source_is_the_default():
+    from app.llm import conversation_format, model_name
+
+    s = Settings()
+    assert s.llm_provider == "huggingface" and s.uses_open_model
+    assert conversation_format(s) == "openai"
+    assert model_name(s) == s.hf_chat_model
+
+
+def test_local_provider_uses_self_hosted_server():
+    from huggingface_hub import AsyncInferenceClient
+
+    from app.llm import build_client, model_name, server_tools
+
+    s = Settings(
+        llm_provider="local", local_llm_url="http://ollama:11434/v1", local_model="qwen3:8b"
+    )
+    client = build_client(s)
+    assert isinstance(client, AsyncInferenceClient)
+    assert model_name(s) == "qwen3:8b"
+    assert server_tools(s) == []
+
+
+async def test_hf_agent_sends_local_model_name(ctx):
+    settings = Settings(llm_provider="local", local_model="llama3.3:70b")
+    client = FakeHF([[chunk(content="ok"), chunk(finish="stop")]])
+    await run(HFAgent(client, settings, ctx))
+    assert client.calls[0]["model"] == "llama3.3:70b"
+
+
+def test_missing_hf_token_is_reported_not_fatal():
+    from app.llm import ProviderNotConfigured, build_client
+
+    with pytest.raises(ProviderNotConfigured, match="HF_TOKEN"):
+        build_client(Settings(llm_provider="huggingface"))

@@ -1,7 +1,9 @@
 name: agentic
 
 x-api-env: &api-env
-  LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+  LLM_PROVIDER: ${LLM_PROVIDER:-huggingface}
+  LOCAL_LLM_URL: ${LOCAL_LLM_URL:-http://ollama:11434/v1}
+  LOCAL_MODEL: ${LOCAL_MODEL:-qwen3:8b}
   MODEL: ${MODEL:-claude-opus-5-5}
   EFFORT: ${EFFORT:-medium}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -102,6 +104,33 @@ services:
         limits:
           memory: 2g
 
+  # --- optional self-hosted open model: docker compose --profile local-llm up ---
+  # Ollama serves open-weight models with an OpenAI-compatible API (LLM_PROVIDER=local).
+  # CPU works for small models; for a GPU, add `gpus: all` (NVIDIA container toolkit).
+  ollama:
+    image: ollama/ollama:0.12.3
+    profiles: ["local-llm"]
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  # One-shot: downloads LOCAL_MODEL into the ollama volume (skipped if already there).
+  ollama-pull:
+    image: ollama/ollama:0.12.3
+    profiles: ["local-llm"]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "${LOCAL_MODEL:-qwen3:8b}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
   # --- optional observability stack: docker compose --profile monitoring up ---
   prometheus:
     image: prom/prometheus:v2.54.1
@@ -124,6 +153,7 @@ services:
     depends_on: [prometheus]
 
 volumes:
+  ollama:
   hf-cache:
   pgdata:
   redisdata:

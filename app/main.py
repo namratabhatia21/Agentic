@@ -23,7 +23,14 @@ from app.agent import Agent
 from app.config import Settings, get_settings
 from app.embeddings import Embedder
 from app.hf_agent import HFAgent
-from app.llm import build_client, build_hf_client, conversation_format, model_name, server_tools
+from app.llm import (
+    ProviderNotConfigured,
+    build_client,
+    build_hf_client,
+    conversation_format,
+    model_name,
+    server_tools,
+)
 from app.logging_setup import configure_logging
 from app.tools import ToolContext, available_tools
 from app.tools.knowledge import add_document
@@ -37,7 +44,14 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     configure_logging(settings.log_level)
     app.state.settings = settings
-    app.state.llm = build_client(settings)
+    try:
+        app.state.llm = build_client(settings)
+        app.state.llm_error = None
+    except ProviderNotConfigured as e:
+        # Start anyway so health checks, the UI and the knowledge base work;
+        # chat requests explain what to configure.
+        log.error("%s", e)
+        app.state.llm, app.state.llm_error = None, str(e)
     app.state.http = httpx.AsyncClient(
         timeout=settings.tool_http_timeout,
         headers={"User-Agent": "agentic-chatbot/0.1 (+https://github.com/namratabhatia21/agentic)"},
@@ -150,6 +164,8 @@ def sse(event: dict) -> str:
 @app.post("/api/chat")
 async def chat(body: ChatRequest, request: Request, _: str = Depends(rate_limit)):
     state = request.app.state
+    if state.llm is None:
+        raise HTTPException(status_code=503, detail=state.llm_error)
     fmt = conversation_format(state.settings)
     try:
         conversation_id = await db.ensure_conversation(
@@ -298,6 +314,8 @@ async def list_tools(request: Request):
         "server_tools": [t["name"] for t in server_tools(settings)],
         "provider": settings.llm_provider,
         "model": model_name(settings),
+        "open_source": settings.uses_open_model,
+        "configured": state.llm is not None,
         "semantic_search": state.embedder is not None,
     }
 

@@ -11,8 +11,8 @@ to the browser over Server-Sent Events.
 flowchart LR
     U[Browser UI] -->|HTTPS, SSE| N[Nginx<br/>rate limit, SSE proxy,<br/>security headers]
     N --> A[FastAPI API<br/>agent loop]
-    A -->|Messages API, streaming| C[(Claude<br/>Anthropic API / Vertex AI / Bedrock)]
-    A -.->|or: LLM_PROVIDER=huggingface| O[(Open-weight LLM<br/>HF Inference Providers)]
+    A -.->|optional| C[(Claude<br/>Anthropic API / Vertex AI / Bedrock)]
+    A -.->|default| O[(Open-weight LLM<br/>HF Inference Providers<br/>or self-hosted Ollama)]
     C -.->|server tools| W[Web search<br/>Web fetch]
     A -->|embed| E[Text Embeddings Inference<br/>bge-small, CPU]
     A -->|images, classification| HF[HF Inference Providers<br/>FLUX, RoBERTa, BART-MNLI]
@@ -82,9 +82,12 @@ returns a string, and a `Tool(...)` entry added to `ALL_TOOLS` in `app/tools/__i
 
 ## Design decisions
 
-- **Model: Claude Opus 5.5 with adaptive thinking.** Effort defaults to `medium`
-  (configurable via `EFFORT`); thinking summaries are streamed to the UI so users see
-  progress during long tool chains.
+- **Open-source model by default.** `LLM_PROVIDER=huggingface` (Qwen3 on Hugging Face
+  Inference Providers) or `local` (Ollama/vLLM/TGI on your own hardware) use the
+  chat-completions agent in `app/hf_agent.py`. Claude Opus 5.5 is optional
+  (`anthropic`/`vertex`/`bedrock`), with adaptive thinking and an `EFFORT` setting.
+  If the chosen provider has no credentials, the app still starts and the chat
+  endpoint says what to configure.
 - **Hand-written agent loop instead of the SDK tool runner**, so every token and
   tool event can be streamed to the browser, and so `pause_turn`, refusals and
   truncated tool calls are handled explicitly.

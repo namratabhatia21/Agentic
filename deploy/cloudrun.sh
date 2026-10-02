@@ -2,8 +2,8 @@
 # Deploy Agentic to Google Cloud: Cloud Run + Cloud SQL (Postgres) + Memorystore (Redis),
 # with Claude served from Vertex AI so model usage is billed to your GCP account.
 #
-#   PROJECT_ID=my-project ./deploy/cloudrun.sh
-#   PROJECT_ID=my-project HF_TOKEN=hf_... ./deploy/cloudrun.sh   # + Hugging Face features
+#   PROJECT_ID=my-project HF_TOKEN=hf_... ./deploy/cloudrun.sh      # open-source model (default)
+#   PROJECT_ID=my-project LLM_PROVIDER=vertex ./deploy/cloudrun.sh  # Claude on Vertex AI
 #
 # Re-runnable: existing resources are reused.
 set -euo pipefail
@@ -15,6 +15,11 @@ SQL_INSTANCE="${SQL_INSTANCE:-agentic-pg}"
 REDIS_INSTANCE="${REDIS_INSTANCE:-agentic-redis}"
 REPO="${REPO:-agentic}"
 SA_NAME="${SA_NAME:-agentic-run}"
+LLM_PROVIDER="${LLM_PROVIDER:-huggingface}"
+if [[ "$LLM_PROVIDER" == "huggingface" && -z "${HF_TOKEN:-}" ]]; then
+  echo "HF_TOKEN is required for LLM_PROVIDER=huggingface (or set LLM_PROVIDER=vertex)" >&2
+  exit 1
+fi
 SA="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/api:$(git rev-parse --short HEAD)"
 
@@ -83,7 +88,7 @@ gcloud run deploy "$SERVICE" \
   --add-cloudsql-instances "$CONN_NAME" --vpc-connector agentic-conn \
   --allow-unauthenticated --timeout 600 --concurrency 40 --min-instances 0 --max-instances 5 \
   --memory 1Gi --cpu 1 \
-  --set-env-vars "LLM_PROVIDER=vertex,GCP_PROJECT_ID=${PROJECT_ID},GCP_REGION=global,EFFORT=medium" \
+  --set-env-vars "LLM_PROVIDER=${LLM_PROVIDER},GCP_PROJECT_ID=${PROJECT_ID},GCP_REGION=global,EFFORT=medium" \
   --set-env-vars "REDIS_URL=redis://${REDIS_HOST}:6379/0" \
   --set-env-vars "DATABASE_URL=postgresql://agentic:${DB_PASSWORD}@/agentic?host=${SOCKET}" \
   --set-env-vars "READONLY_DATABASE_URL=postgresql://agent_readonly:${RO_PASSWORD}@/agentic?host=${SOCKET}" \
