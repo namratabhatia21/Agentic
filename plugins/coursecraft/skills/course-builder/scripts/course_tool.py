@@ -41,7 +41,9 @@ VERBS = {
     "exemplify explain extend generalize give illustrate infer interpret paraphrase predict "
     "rephrase summarize translate",
     "apply": "apply calculate carry change compute construct demonstrate employ execute "
-    "implement modify operate perform prepare produce rewrite schedule sketch solve use",
+    "implement modify operate perform prepare produce rewrite schedule sketch solve use "
+    # Observable workplace procedures, common in compliance and onboarding courses.
+    "complete configure follow install navigate report respond submit",
     "analyze": "analyze attribute break categorize compare contrast deconstruct diagnose "
     "differentiate discriminate dissect distinguish examine experiment investigate organize "
     "outline question relate structure test troubleshoot",

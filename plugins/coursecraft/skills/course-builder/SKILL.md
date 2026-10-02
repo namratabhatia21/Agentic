@@ -74,7 +74,9 @@ means rewriting it. Skip the checkpoint only if the user told you not to stop.
 
 ## 3. Development
 
-Follow [references/lesson-design.md](references/lesson-design.md) and
+Start only once `01-analysis.md` exists and `course.json` passes `check`. Lessons written
+before the blueprint drift from the objectives. Follow
+[references/lesson-design.md](references/lesson-design.md) and
 [references/assessment.md](references/assessment.md):
 
 - Write one Markdown file per lesson in `course/modules/`, using the Gagné lesson template.
