@@ -1,0 +1,50 @@
+# Ingestion pipeline (ingest/) CI/CD.
+# Required CI/CD variables: ACR_LOGIN_SERVER, ACR_USERNAME, ACR_PASSWORD,
+# AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID, AZURE_RG,
+# plus the INGEST_* settings (see .env.example) set as masked variables on the Container Apps.
+stages: [lint, test, build, deploy]
+
+variables:
+  IMAGE: $ACR_LOGIN_SERVER/ingest:$CI_COMMIT_SHORT_SHA
+
+lint:
+  stage: lint
+  image: python:3.12-slim
+  script:
+    - pip install -q ruff
+    - ruff check ingest tests/test_ingest.py
+
+test:
+  stage: test
+  image: python:3.12-slim
+  services:
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    INGEST_REDIS_URL: redis://redis:6379/1
+  script:
+    - pip install -q -e ".[ingest,dev]"
+    - pytest -q tests/test_ingest.py
+
+build:
+  stage: build
+  image: docker:27
+  services: [docker:27-dind]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - echo "$ACR_PASSWORD" | docker login $ACR_LOGIN_SERVER -u $ACR_USERNAME --password-stdin
+    - docker build -f Dockerfile.ingest -t $IMAGE .
+    - docker push $IMAGE
+
+deploy:
+  stage: deploy
+  image: mcr.microsoft.com/azure-cli
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  script:
+    - az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID
+    # Same image, two apps: API and worker.
+    - az containerapp update -g $AZURE_RG -n ingest-api --image $IMAGE
+    - az containerapp update -g $AZURE_RG -n ingest-worker --image $IMAGE --command "python" --args "-m" "ingest.worker"
