@@ -1,11 +1,7 @@
 # Using your cloud credits
 
-Two different things cost money here. Each one is paid differently.
-
-| What | Paid by |
-|---|---|
-| **Running the chatbot**: Claude tokens, servers, database | Credits on whichever platform you deploy to (this guide) |
-| **Building it with Claude Code** (the coding sessions) | Your Claude subscription/plan. It can't be charged to GCP/AWS credits. |
+Running the chatbot costs model tokens plus servers and a database. Both can be paid
+with credits on the platform you deploy to.
 
 The app can call Claude through three platforms. Pick the one where your credits are
 by setting `LLM_PROVIDER`. No code changes needed.
