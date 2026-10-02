@@ -1,0 +1,15 @@
+{
+  "name": "namrata-skills",
+  "description": "Claude Code plugins by Namrata Bhatia",
+  "owner": {
+    "name": "Namrata Bhatia",
+    "url": "https://github.com/namratabhatia21"
+  },
+  "plugins": [
+    {
+      "name": "launchpad",
+      "source": "./plugins/launchpad",
+      "description": "Preflight a skill or plugin and write its launch kit: README, demo video script, posts for X, LinkedIn, Reddit, HN and Instagram."
+    }
+  ]
+}

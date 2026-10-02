@@ -1,0 +1,14 @@
+{
+  "name": "launchpad",
+  "displayName": "Launchpad",
+  "description": "Get a Claude Code skill or plugin ready to launch and write its marketing kit: preflight checks, README, demo video script and channel-native posts.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Namrata Bhatia",
+    "url": "https://github.com/namratabhatia21"
+  },
+  "homepage": "https://github.com/namratabhatia21/Agentic/tree/main/plugins/launchpad",
+  "repository": "https://github.com/namratabhatia21/Agentic",
+  "license": "MIT",
+  "keywords": ["skills", "marketing", "launch", "readme", "open-source"]
+}

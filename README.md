@@ -24,6 +24,16 @@ deploy script.
 
 - Architecture & design decisions → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Paying with GCP / AWS / Anthropic credits → [docs/CLOUD_CREDITS.md](docs/CLOUD_CREDITS.md)
+- Building, packaging and marketing a Claude Code skill → [docs/CLAUDE_SKILLS_GUIDE.md](docs/CLAUDE_SKILLS_GUIDE.md)
+
+This repo is also a Claude Code plugin marketplace. Its
+[`launchpad`](plugins/launchpad) plugin checks a skill and writes its launch kit
+(README, demo video script, posts):
+
+```bash
+claude plugin marketplace add namratabhatia21/Agentic
+claude plugin install launchpad@namrata-skills
+```
 
 ## Quick start (Docker)
 
@@ -152,4 +162,6 @@ nginx/             reverse proxy config
 monitoring/        Prometheus + Grafana provisioning
 deploy/            Cloud Run deployment script
 tests/             unit tests incl. agent loop against a fake model
+plugins/launchpad/ Claude Code plugin: preflight + launch kit for skills
+.claude-plugin/    marketplace manifest that lists the plugin
 ```
