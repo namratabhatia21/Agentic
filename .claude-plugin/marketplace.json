@@ -10,6 +10,11 @@
       "name": "launchpad",
       "source": "./plugins/launchpad",
       "description": "Preflight a skill or plugin and write its launch kit: README, demo video script, posts for X, LinkedIn, Reddit, HN and Instagram."
+    },
+    {
+      "name": "coursecraft",
+      "source": "./plugins/coursecraft",
+      "description": "Turn any content into an online course with ADDIE and Bloom's taxonomy: aligned objectives, lessons, quizzes, Moodle/Aiken/CSV exports and an HTML preview."
     }
   ]
 }

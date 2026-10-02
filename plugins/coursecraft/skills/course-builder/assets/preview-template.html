@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --panel: #ffffff; --ink: #1d1d1f; --muted: #626268; --line: #e4e2dc;
+    --accent: #2f5d50; --on-accent: #ffffff; --ok: #1f7a4d; --bad: #b3261e; --chip: #eef3f1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141516; --panel: #1c1d1f; --ink: #ececec; --muted: #a8a8ae; --line: #2e2f33;
+      --accent: #8fc5b3; --on-accent: #10201b; --ok: #6fd19c; --bad: #ff8a80; --chip: #24302c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { display: grid; grid-template-columns: 290px 1fr; min-height: 100vh; }
+  nav {
+    border-right: 1px solid var(--line); padding: 20px 16px; background: var(--panel);
+    position: sticky; top: 0; height: 100vh; overflow: auto;
+  }
+  nav .title { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
+  nav .meta { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  nav .group {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+    margin: 18px 0 6px;
+  }
+  nav button {
+    display: block; width: 100%; text-align: left; background: none; border: 0; color: var(--ink);
+    padding: 6px 8px; border-radius: 6px; font: inherit; font-size: 14px; cursor: pointer;
+  }
+  nav button.sub { padding-left: 18px; }
+  nav button:hover, nav button[aria-current="page"] { background: var(--chip); }
+  main { padding: 32px clamp(16px, 5vw, 64px); max-width: 860px; }
+  main:focus { outline: none; }
+  .chip {
+    display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px;
+    background: var(--chip); color: var(--accent); margin-right: 6px; text-transform: capitalize;
+  }
+  .muted { color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; display: block; overflow-x: auto; }
+  th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+  pre { background: var(--chip); padding: 12px; border-radius: 8px; overflow: auto; }
+  blockquote { border-left: 3px solid var(--accent); margin: 12px 0; padding: 2px 14px; }
+  img { max-width: 100%; }
+  .q {
+    border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 16px 0;
+    background: var(--panel);
+  }
+  .q label { display: block; padding: 4px 0; cursor: pointer; }
+  .fb { margin-top: 8px; font-size: 14px; }
+  .ok { color: var(--ok); }
+  .bad { color: var(--bad); }
+  .q button {
+    margin-top: 8px; background: var(--accent); color: var(--on-accent); border: 0;
+    border-radius: 6px; padding: 6px 14px; font: inherit; cursor: pointer;
+  }
+  input[type="text"] { font: inherit; padding: 4px 8px; width: 100%; max-width: 360px; }
+  @media (max-width: 760px) {
+    .wrap { grid-template-columns: 1fr; }
+    nav { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav id="nav" aria-label="Course"></nav>
+  <main id="main" tabindex="-1"></main>
+</div>
+<script id="course" type="application/json">__DATA__</script>
+<script>
+const C = JSON.parse(document.getElementById("course").textContent);
+const modules = C.modules || [];
+
+function el(tag, attrs = {}, ...kids) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === "html") node.innerHTML = value;
+    else node.setAttribute(key, value);
+  }
+  for (const kid of kids) if (kid != null) node.append(kid);
+  return node;
+}
+
+const objectives = {};
+modules.forEach(m => (m.objectives || []).forEach(o => { objectives[o.id] = o; }));
+const chip = text => el("span", { class: "chip" }, text || "");
+const objectiveList = ids => el("ul", {}, ...[].concat(ids || [])
+  .map(id => objectives[id]).filter(Boolean)
+  .map(o => el("li", {}, chip(o.bloom), o.text)));
+
+// ---- quiz items --------------------------------------------------------------------------
+function choiceItem(q, box, feedback) {
+  const options = q.type === "truefalse" ? ["True", "False"] : q.options || [];
+  const kind = q.type === "multi" ? "checkbox" : "radio";
+  options.forEach((option, i) => box.append(
+    el("label", {}, el("input", { type: kind, name: "q-" + q.id, value: i }), " " + option)));
+  const button = el("button", { type: "button" }, "Check");
+  button.onclick = () => {
+    const picked = [...box.querySelectorAll("input:checked")].map(x => Number(x.value));
+    const key = q.type === "truefalse" ? [q.answer ? 0 : 1] : [].concat(q.answer);
+    const right = picked.length === key.length && picked.every(p => key.includes(p));
+    const notes = Array.isArray(q.feedback)
+      ? picked.map(p => q.feedback[p]).filter(Boolean)
+      : (q.feedback ? [q.feedback] : []);
+    feedback.className = "fb " + (right ? "ok" : "bad");
+    const fallback = right ? "Correct." : "Not quite. Try again.";
+    feedback.textContent = (right ? "\u2713 " : "\u2717 ") + (notes.join(" ") || fallback);
+  };
+  box.append(button);
+}
+
+function shortItem(q, box, feedback) {
+  const input = el("input", { type: "text", "aria-label": "Your answer" });
+  const button = el("button", { type: "button" }, "Check");
+  button.onclick = () => {
+    const accepted = q.answer || [];
+    const right = accepted.some(a => a.toLowerCase() === input.value.trim().toLowerCase());
+    feedback.className = "fb " + (right ? "ok" : "bad");
+    feedback.textContent = right ? "Correct." : "Accepted answers: " + accepted.join(", ");
+  };
+  box.append(input, el("br"), button);
+}
+
+function taskItem(q, box) {
+  box.append(el("p", { class: "muted" }, "Graded task" + (q.minutes ? ` (${q.minutes} min)` : "")));
+  if (Array.isArray(q.rubric)) {
+    box.append(el("table", {},
+      el("tr", {}, el("th", {}, "Criterion"), el("th", {}, "What excellent looks like")),
+      ...q.rubric.map(c => el("tr", {},
+        el("td", {}, c.criterion || ""), el("td", {}, c.excellent || c.description || "")))));
+  } else if (q.rubric) {
+    box.append(el("p", {}, "Rubric: " + q.rubric));
+  }
+}
+
+function quiz(items) {
+  return items.map(q => {
+    const box = el("div", { class: "q" });
+    const feedback = el("div", { class: "fb", "aria-live": "polite" });
+    box.append(el("div", { class: "muted" }, chip(q.bloom), q.id),
+               el("p", {}, el("strong", {}, q.stem || "")));
+    if (["mcq", "multi", "truefalse"].includes(q.type)) choiceItem(q, box, feedback);
+    else if (q.type === "short") shortItem(q, box, feedback);
+    else taskItem(q, box);
+    box.append(feedback);
+    return box;
+  });
+}
+
+// ---- navigation --------------------------------------------------------------------------
+const nav = document.getElementById("nav");
+const main = document.getElementById("main");
+const views = [];
+
+function show(index, scroll = true) {
+  main.replaceChildren(views[index]());
+  nav.querySelectorAll("button").forEach((b, i) => {
+    if (i === index) b.setAttribute("aria-current", "page");
+    else b.removeAttribute("aria-current");
+  });
+  if (!scroll) return;
+  main.focus({ preventScroll: true });
+  // On phones the menu sits above the content, so jump down to it.
+  if (matchMedia("(max-width: 760px)").matches) main.scrollIntoView();
+  else window.scrollTo(0, 0);
+}
+
+function addView(label, render, sub = true) {
+  const index = views.length;
+  views.push(render);
+  const button = el("button", { type: "button", class: sub ? "sub" : "" }, label);
+  button.onclick = () => show(index);
+  nav.append(button);
+}
+
+const minutes = modules
+  .flatMap(m => [...(m.lessons || []), ...(m.activities || [])])
+  .reduce((sum, x) => sum + (x.minutes || 0), 0);
+nav.append(
+  el("p", { class: "title" }, C.title || "Course"),
+  el("p", { class: "meta" }, [C.audience && C.audience.persona,
+    minutes ? `About ${minutes} min of lessons and activities` : ""].filter(Boolean).join(" · ")));
+
+addView("Overview", () => el("div", {},
+  el("h1", {}, C.title || ""),
+  el("p", { class: "muted" }, C.subtitle || ""),
+  el("h2", {}, "By the end of this course you will be able to"),
+  el("ul", {}, ...(C.outcomes || []).map(o => el("li", {}, chip(o.bloom), o.text))),
+  el("h2", {}, "Modules"),
+  el("ol", {}, ...modules.map(m => el("li", {}, m.title || m.id)))), false);
+
+modules.forEach(m => {
+  nav.append(el("p", { class: "group" }, m.title || m.id));
+  (m.lessons || []).forEach(l => addView(l.title || l.id, () => el("div", {},
+    el("p", { class: "muted" }, `${m.title || m.id} · ${l.minutes || "?"} min`),
+    el("h1", {}, l.title || l.id),
+    el("details", {}, el("summary", {}, "Objectives"), objectiveList(l.objectives)),
+    l.html ? el("article", { html: l.html })
+           : el("p", { class: "muted" }, "Content not written yet."))));
+  (m.activities || []).forEach(a => addView("Activity: " + (a.title || a.id), () => el("div", {},
+    el("h1", {}, a.title || a.id),
+    el("p", {}, chip(a.type), `${a.minutes || "?"} min`),
+    el("p", {}, a.instructions || ""),
+    objectiveList(a.objectives))));
+  if ((m.assessment || []).length) {
+    addView("Check your understanding", () => el("div", {},
+      el("h1", {}, (m.title || m.id) + ": check your understanding"), ...quiz(m.assessment)));
+  }
+});
+
+if ((C.final_assessment || []).length) {
+  nav.append(el("p", { class: "group" }, "Final"));
+  addView("Final assessment", () => el("div", {},
+    el("h1", {}, "Final assessment"), ...quiz(C.final_assessment)));
+}
+
+show(0, false);
+</script>
+</body>
+</html>

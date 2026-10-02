@@ -26,12 +26,16 @@ deploy script.
 - Paying with GCP / AWS / Anthropic credits → [docs/CLOUD_CREDITS.md](docs/CLOUD_CREDITS.md)
 - Building, packaging and marketing a Claude Code skill → [docs/CLAUDE_SKILLS_GUIDE.md](docs/CLAUDE_SKILLS_GUIDE.md)
 
-This repo is also a Claude Code plugin marketplace. Its
-[`launchpad`](plugins/launchpad) plugin checks a skill and writes its launch kit
-(README, demo video script, posts):
+This repo is also a Claude Code plugin marketplace:
+
+| Plugin | What it does |
+|---|---|
+| [`coursecraft`](plugins/coursecraft) | Turns any content into an online course with ADDIE and Bloom's taxonomy: aligned objectives, lessons, quizzes, Moodle/Aiken/CSV exports, HTML preview |
+| [`launchpad`](plugins/launchpad) | Checks a skill and writes its launch kit (README, demo video script, posts) |
 
 ```bash
 claude plugin marketplace add namratabhatia21/Agentic
+claude plugin install coursecraft@namrata-skills
 claude plugin install launchpad@namrata-skills
 ```
 
@@ -162,6 +166,6 @@ nginx/             reverse proxy config
 monitoring/        Prometheus + Grafana provisioning
 deploy/            Cloud Run deployment script
 tests/             unit tests incl. agent loop against a fake model
-plugins/launchpad/ Claude Code plugin: preflight + launch kit for skills
+plugins/           Claude Code plugins: coursecraft (course builder), launchpad (skill launch kit)
 .claude-plugin/    marketplace manifest that lists the plugin
 ```

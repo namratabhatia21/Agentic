@@ -1,0 +1,14 @@
+{
+  "name": "coursecraft",
+  "displayName": "CourseCraft",
+  "description": "Turn any content into a complete online course with ADDIE and Bloom's taxonomy: objectives, aligned lessons, quizzes with feedback, LMS exports and an HTML preview.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Namrata Bhatia",
+    "url": "https://github.com/namratabhatia21"
+  },
+  "homepage": "https://github.com/namratabhatia21/Agentic/tree/main/plugins/coursecraft",
+  "repository": "https://github.com/namratabhatia21/Agentic",
+  "license": "MIT",
+  "keywords": ["instructional-design", "e-learning", "course", "addie", "blooms-taxonomy", "lms", "moodle"]
+}

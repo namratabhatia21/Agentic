@@ -29,7 +29,7 @@ def write_skill(folder: Path, frontmatter: str, body: str = "Do the thing.\n") -
 def test_bundled_plugin_and_marketplace_have_no_errors():
     report = preflight.run(REPO)
     assert report.errors == []
-    assert report.counts == {"skill": 1, "plugin": 1, "market": 1}
+    assert report.counts == {"skill": 2, "plugin": 2, "market": 1}
 
 
 def test_good_skill_passes_clean(tmp_path):

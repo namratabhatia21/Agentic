@@ -1,0 +1,303 @@
+{
+  "title": "Write Better Prompts for AI Assistants",
+  "subtitle": "A 90-minute self-paced course for people who use AI assistants at work",
+  "sources": [
+    {
+      "id": "S1",
+      "title": "Team notes: prompting guidelines",
+      "location": "notes/prompting.md"
+    }
+  ],
+  "audience": {
+    "persona": "Office professionals new to AI assistants",
+    "prior_knowledge": "Has used a chat assistant a few times; no technical background",
+    "needs": "Gets generic or off-target answers and rewrites them by hand"
+  },
+  "format": {
+    "delivery": "self-paced",
+    "total_minutes": 90,
+    "platform": "Moodle",
+    "model": "ADDIE"
+  },
+  "outcomes": [
+    {
+      "id": "CO1",
+      "text": "Write prompts that produce usable answers for everyday work tasks on the first try",
+      "bloom": "create"
+    },
+    {
+      "id": "CO2",
+      "text": "Critique prompts written by others against the prompt checklist",
+      "bloom": "evaluate"
+    }
+  ],
+  "modules": [
+    {
+      "id": "M1",
+      "title": "How assistants read your prompt",
+      "objectives": [
+        {
+          "id": "M1.1",
+          "text": "Identify the four parts of an effective prompt: task, context, format and examples",
+          "bloom": "remember",
+          "knowledge": "factual",
+          "supports": [
+            "CO1"
+          ]
+        },
+        {
+          "id": "M1.2",
+          "text": "Explain how added context and examples change an assistant's answer",
+          "bloom": "understand",
+          "knowledge": "conceptual",
+          "supports": [
+            "CO1",
+            "CO2"
+          ]
+        }
+      ],
+      "lessons": [
+        {
+          "id": "M1.L1",
+          "title": "The anatomy of a prompt",
+          "minutes": 7,
+          "objectives": [
+            "M1.1"
+          ],
+          "media": "text + diagram",
+          "file": "modules/m1-l1-anatomy.md"
+        },
+        {
+          "id": "M1.L2",
+          "title": "Why context changes everything",
+          "minutes": 8,
+          "objectives": [
+            "M1.2"
+          ],
+          "media": "text + side-by-side examples",
+          "file": "modules/m1-l2-context.md"
+        }
+      ],
+      "activities": [],
+      "assessment": [
+        {
+          "id": "M1.Q1",
+          "type": "mcq",
+          "objective": "M1.1",
+          "bloom": "remember",
+          "stem": "Which part of a prompt tells the assistant how the answer should be laid out?",
+          "options": [
+            "Task",
+            "Context",
+            "Format",
+            "Examples"
+          ],
+          "answer": 2,
+          "feedback": [
+            "The task says what to do, not how to present it.",
+            "Context gives background, such as audience and purpose.",
+            "Right. Format covers length, structure and style of the answer.",
+            "Examples show a sample, but the layout instruction itself is the format."
+          ]
+        },
+        {
+          "id": "M1.Q2",
+          "type": "mcq",
+          "objective": "M1.2",
+          "bloom": "understand",
+          "stem": "Two colleagues ask for 'a summary of this report'. One adds 'for our CFO, who cares about cost'. Why does the second get a more useful answer?",
+          "options": [
+            "Longer prompts always produce better answers",
+            "The assistant can choose what to keep based on who will read it",
+            "Mentioning a job title switches the assistant into a business mode",
+            "The second prompt is more polite"
+          ],
+          "answer": 1,
+          "feedback": [
+            "Length alone doesn't help; relevant detail does.",
+            "Right. Knowing the reader and their priority tells the assistant what matters.",
+            "There is no special mode; the extra context is what changes the answer.",
+            "Politeness has little effect on relevance."
+          ]
+        },
+        {
+          "id": "M1.Q3",
+          "type": "truefalse",
+          "objective": "M1.2",
+          "bloom": "understand",
+          "stem": "Showing the assistant one example of the output you want usually makes its answer closer to what you need.",
+          "answer": true,
+          "feedback": "Examples are one of the strongest signals of what 'good' looks like."
+        }
+      ]
+    },
+    {
+      "id": "M2",
+      "title": "Writing and improving prompts",
+      "objectives": [
+        {
+          "id": "M2.1",
+          "text": "Rewrite a vague request as a four-part prompt for a real work task",
+          "bloom": "apply",
+          "knowledge": "procedural",
+          "supports": [
+            "CO1"
+          ]
+        },
+        {
+          "id": "M2.2",
+          "text": "Diagnose why a prompt produced an off-target answer",
+          "bloom": "analyze",
+          "knowledge": "conceptual",
+          "supports": [
+            "CO2"
+          ]
+        },
+        {
+          "id": "M2.3",
+          "text": "Judge which of two prompts better fits a task, using the prompt checklist",
+          "bloom": "evaluate",
+          "knowledge": "metacognitive",
+          "supports": [
+            "CO2"
+          ]
+        },
+        {
+          "id": "M2.4",
+          "text": "Design a reusable prompt template for a recurring task in your own job",
+          "bloom": "create",
+          "knowledge": "procedural",
+          "supports": [
+            "CO1"
+          ]
+        }
+      ],
+      "lessons": [
+        {
+          "id": "M2.L1",
+          "title": "The rewrite method",
+          "minutes": 9,
+          "objectives": [
+            "M2.1",
+            "M2.4"
+          ],
+          "media": "text + worked example",
+          "file": "modules/m2-l1-rewrite.md"
+        },
+        {
+          "id": "M2.L2",
+          "title": "Debugging and judging prompts",
+          "minutes": 10,
+          "objectives": [
+            "M2.2",
+            "M2.3"
+          ],
+          "media": "text + checklist",
+          "file": "modules/m2-l2-debugging.md"
+        }
+      ],
+      "activities": [
+        {
+          "id": "M2.A1",
+          "title": "Rewrite three real requests",
+          "type": "practice",
+          "minutes": 12,
+          "objectives": [
+            "M2.1"
+          ],
+          "instructions": "Pick three requests you sent to an assistant this month. Rewrite each with task, context, format and examples, run both versions, and note what changed."
+        },
+        {
+          "id": "M2.A2",
+          "title": "Prompt clinic",
+          "type": "case study",
+          "minutes": 10,
+          "objectives": [
+            "M2.2",
+            "M2.3"
+          ],
+          "instructions": "For each of the three before/after pairs provided, name the missing part that caused the weak answer, then use the checklist to decide which prompt is better and why."
+        },
+        {
+          "id": "M2.A3",
+          "title": "Draft your first template",
+          "type": "practice",
+          "minutes": 8,
+          "objectives": [
+            "M2.4"
+          ],
+          "instructions": "Take your best rewrite from the first activity and turn the specifics into [placeholders] so you can reuse it next week. Save it where you will find it."
+        }
+      ],
+      "assessment": [
+        {
+          "id": "M2.Q1",
+          "type": "mcq",
+          "objective": "M2.1",
+          "bloom": "apply",
+          "stem": "Your manager asks for a short update on a delayed project. Which prompt applies the four-part method best?",
+          "options": [
+            "Write a project update for my manager that is detailed, comprehensive and covers every single part of the project.",
+            "Write a 5-line update for my manager on the 2-week delay, its cause (vendor) and new date, like this: [paste].",
+            "You are the world's best writer. Write an amazing, impressive project update that my manager will love.",
+            "Write a project update about the delay for my manager. Make it good, clear, professional and not too long."
+          ],
+          "answer": 1,
+          "feedback": [
+            "'Detailed and comprehensive' conflicts with a short update and adds no facts.",
+            "Right. It has the task, context (reader, delay, cause), format (5 lines) and an example.",
+            "Hype words aren't context; the assistant still doesn't know the facts.",
+            "Better, but 'good' and 'not too long' leave the length and the facts to guesswork."
+          ]
+        },
+        {
+          "id": "M2.Q2",
+          "type": "mcq",
+          "objective": "M2.2",
+          "bloom": "analyze",
+          "stem": "A prompt asked 'Draft an email to the client about the invoice' and the assistant wrote a friendly reminder, but you needed to dispute an overcharge. What is the most likely cause?",
+          "options": [
+            "The assistant ignored the task it was given in the prompt",
+            "The prompt was missing context about the situation and goal",
+            "The prompt needed a format instruction for the email layout",
+            "Assistants can't write emails about money or invoices well"
+          ],
+          "answer": 1,
+          "feedback": [
+            "It did draft the email; it just guessed the purpose.",
+            "Right. Without the dispute and the goal, a reminder is the most common guess.",
+            "A format instruction would change layout, not the purpose of the email.",
+            "Assistants handle emails well when they know the situation."
+          ]
+        }
+      ]
+    }
+  ],
+  "final_assessment": [
+    {
+      "id": "F1",
+      "type": "project",
+      "objectives": [
+        "M2.3",
+        "M2.4"
+      ],
+      "bloom": "create",
+      "minutes": 18,
+      "stem": "Choose a task you do every week. Design a reusable prompt template for it, test it twice, and write 3-5 sentences judging how well it worked against the checklist and what you would change.",
+      "rubric": [
+        {
+          "criterion": "Template",
+          "excellent": "All four parts present; placeholders make it reusable"
+        },
+        {
+          "criterion": "Testing",
+          "excellent": "Two real runs shown, with the outputs"
+        },
+        {
+          "criterion": "Judgement",
+          "excellent": "Uses checklist items to justify a specific improvement"
+        }
+      ]
+    }
+  ]
+}
